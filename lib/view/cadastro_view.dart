@@ -10,198 +10,124 @@ class CadastroView extends StatefulWidget {
 }
 
 class _CadastroViewState extends State<CadastroView> {
-  // Controladores para capturar o que o usuário digita
-  final nomeController = TextEditingController();
-  final telefoneController = TextEditingController();
-  final emailController = TextEditingController();
-  final senhaController = TextEditingController();
-  final confirmarSenhaController = TextEditingController();
-
   final usuarioController = GetIt.I<UsuarioController>();
+  
+  final _formKey = GlobalKey<FormState>();
+  final _nomeController = TextEditingController();
+  final _telefoneController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _senhaController = TextEditingController();
 
-  // Variável para controlar o indicador de carregamento na tela (Feedback de progresso)
-  bool carregando = false;
+  bool _carregando = false;
 
-  // Função simples para verificar o formato do e-mail
-  bool emailValido(String email) {
-    return email.contains('@') && email.contains('.');
+  @override
+  void dispose() {
+    _nomeController.dispose();
+    _telefoneController.dispose();
+    _emailController.dispose();
+    _senhaController.dispose();
+    super.dispose();
   }
 
-  // 👉 VALIDAÇÃO DE SENHA FORTE (Critério exigido na Rubrica do RF002)
-  bool verificarSenhaForte(String senha) {
-    if (senha.length < 6) return false; // Comprimento mínimo de 6 caracteres
-    if (!senha.contains(RegExp(r'[A-Z]'))) return false; // Pelo menos uma letra maiúscula
-    if (!senha.contains(RegExp(r'[a-z]'))) return false; // Pelo menos uma letra minúscula
-    if (!senha.contains(RegExp(r'[0-9]'))) return false; // Pelo menos um número
-    if (!senha.contains(RegExp(r'[!@#\$&*~-]'))) return false; // Pelo menos um caractere especial
-    return true;
+  // 👉 RF002: VALIDAÇÃO COMPLEXA DE SEGURANÇA DA SENHA
+  String? _validarSenha(String? value) {
+    if (value == null || value.isEmpty) return 'Digite uma senha.';
+    if (value.length < 6) return 'A senha deve ter pelo menos 6 caracteres.';
+    
+    // Regex para verificar Letra Maiúscula, Minúscula e Caractere Especial
+    bool temMaiuscula = value.contains(RegExp(r'[A-Z]'));
+    bool temMinuscula = value.contains(RegExp(r'[a-z]'));
+    bool temEspecial = value.contains(RegExp(r'[!@#\$&*~-%_+=^]'));
+
+    if (!temMaiuscula || !temMinuscula || !temEspecial) {
+      return 'A senha precisa de letras maiúsculas, minúsculas e símbolos.';
+    }
+    return null;
   }
 
-  void executarCadastro() async {
-    // 1. Validação de campos vazios
-    if (nomeController.text.isEmpty ||
-        telefoneController.text.isEmpty ||
-        emailController.text.isEmpty ||
-        senhaController.text.isEmpty ||
-        confirmarSenhaController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, preencha todos os campos.')),
-      );
-      return;
-    }
+  Future<void> _executarCadastro() async {
+    if (!_formKey.currentState!.validate()) return;
 
-    // 2. Validação do formato do e-mail
-    if (!emailValido(emailController.text)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Insira um endereço de e-mail válido.')),
-      );
-      return;
-    }
-
-    // 3. Validação de segurança da senha (RF002)
-    if (!verificarSenhaForte(senhaController.text)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Senha fraca! A senha deve ter no mínimo 6 caracteres, incluir letras maiúsculas, minúsculas, números e um caractere especial (!@#\$&*~-).',
-          ),
-          duration: Duration(seconds: 5),
-        ),
-      );
-      return;
-    }
-
-    // 4. Validação de coincidência de senhas
-    if (senhaController.text != confirmarSenhaController.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('As senhas digitadas não coincidem.')),
-      );
-      return;
-    }
-
-    // Se passou por todas as validações, ativa a tela de carregamento
-    setState(() {
-      carregando = true;
-    });
+    setState(() => _carregando = true);
 
     try {
-      // Envia os dados para o controller fazer a mágica no Firebase
       await usuarioController.cadastrar(
-        emailController.text,
-        senhaController.text,
-        nomeController.text,
-        telefoneController.text,
+        _emailController.text,
+        _senhaController.text,
+        _nomeController.text,
+        _telefoneController.text,
       );
-
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cadastro realizado com sucesso!')),
+          const SnackBar(content: Text('Conta criada com sucesso! 🎉'), backgroundColor: Colors.green),
         );
-        Navigator.pop(context); // Fecha a tela de cadastro e volta para o Login
+        Navigator.pushReplacementNamed(context, 'home');
       }
-    } catch (erro) {
-      // Captura o erro retornado pelo Firebase (ex: e-mail já cadastrado) e mostra na tela
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao cadastrar: ${erro.toString()}')),
+          SnackBar(content: Text('Erro ao cadastrar: ${e.toString()}'), backgroundColor: Colors.red),
         );
       }
     } finally {
-      // Desativa o indicador de carregamento aconteça o que acontecer
-      if (mounted) {
-        setState(() {
-          carregando = false;
-        });
-      }
+      if (mounted) setState(() => _carregando = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Criar Conta'),
-      ),
-      // 👉 Se "carregando" for true, mostra o indicador de progresso do Firebase (RF002)
-      // Se for false, exibe o formulário normal de cadastro
-      body: carregando
-          ? const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(color: Colors.green),
-                  SizedBox(height: 15),
-                  Text('Salvando seus dados na nuvem...'),
-                ],
-              ),
-            )
-          : Padding(
-              padding: const EdgeInsets.all(16),
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    TextField(
-                      controller: nomeController,
-                      decoration: const InputDecoration(
-                        labelText: 'Nome Completo',
-                        prefixIcon: Icon(Icons.person),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: telefoneController,
-                      decoration: const InputDecoration(
-                        labelText: 'Telefone',
-                        prefixIcon: Icon(Icons.phone),
-                      ),
-                      keyboardType: TextInputType.phone,
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: emailController,
-                      decoration: const InputDecoration(
-                        labelText: 'E-mail',
-                        prefixIcon: Icon(Icons.email),
-                      ),
-                      keyboardType: TextInputType.emailAddress,
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: senhaController,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Senha',
-                        prefixIcon: Icon(Icons.lock),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: confirmarSenhaController,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Confirmar Senha',
-                        prefixIcon: Icon(Icons.lock_outline),
-                      ),
-                    ),
-                    const SizedBox(height: 30),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          padding: const EdgeInsets.symmetric(vertical: 15),
-                        ),
-                        onPressed: executarCadastro,
-                        child: const Text(
-                          'Cadastrar',
-                          style: TextStyle(color: Colors.white, fontSize: 16),
-                        ),
-                      ),
-                    ),
-                  ],
+      appBar: AppBar(title: const Text('Criar Conta'), backgroundColor: Colors.green, foregroundColor: Colors.white),
+      body: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextFormField(
+                  controller: _nomeController,
+                  decoration: const InputDecoration(labelText: 'Nome Completo', border: OutlineInputBorder()),
+                  validator: (v) => v!.isEmpty ? 'Informe seu nome.' : null,
                 ),
-              ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _telefoneController,
+                  decoration: const InputDecoration(labelText: 'Telefone com DDD', border: OutlineInputBorder()),
+                  validator: (v) => v!.isEmpty ? 'Informe seu telefone.' : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _emailController,
+                  decoration: const InputDecoration(labelText: 'E-mail', border: OutlineInputBorder()),
+                  validator: (v) => v!.isEmpty || !v.contains('@') ? 'Informe um e-mail válido.' : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _senhaController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Senha',
+                    helperText: 'Mínimo 6 dígitos, com Maiúscula e Símbolo.',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: _validarSenha, // 👈 Aplica a validação forte
+                ),
+                const SizedBox(height: 20),
+                _carregando
+                    ? const Center(child: CircularProgressIndicator(color: Colors.green))
+                    : ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                        onPressed: _executarCadastro,
+                        child: const Text('Cadastrar'),
+                      ),
+              ],
             ),
+          ),
+        ),
+      ),
     );
   }
 }

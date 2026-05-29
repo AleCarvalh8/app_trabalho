@@ -13,7 +13,9 @@ class BuscaView extends StatefulWidget {
 class _BuscaViewState extends State<BuscaView> {
   final pratoController = GetIt.I<PratoController>();
   final TextEditingController _buscaController = TextEditingController();
+  
   String _textoBusca = "";
+  String _criterioOrdenacao = "nome"; // 👈 Estado para armazenar o critério (nome ou preco)
 
   @override
   void dispose() {
@@ -30,9 +32,7 @@ class _BuscaViewState extends State<BuscaView> {
         foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pushNamed(context, 'home'); 
-          },
+          onPressed: () => Navigator.pushNamed(context, 'home'),
         ),
       ),
       body: Column(
@@ -55,53 +55,62 @@ class _BuscaViewState extends State<BuscaView> {
                         },
                       )
                     : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Colors.green, width: 2),
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              onChanged: (text) {
-                setState(() {
-                  _textoBusca = text;
-                });
-              },
+              onChanged: (text) => setState(() => _textoBusca = text),
             ),
           ),
+
+          // 👉 RF006: SELETOR VISUAL PARA ORDENAR OS RESULTADOS DA PESQUISA
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Ordenar por:', style: TextStyle(fontWeight: FontWeight.bold)),
+                DropdownButton<String>(
+                  value: _criterioOrdenacao,
+                  items: const [
+                    DropdownMenuItem(value: "nome", child: Text("Ordem Alfabética (A-Z)")),
+                    DropdownMenuItem(value: "preco", child: Text("Menor Preço")),
+                  ],
+                  onChanged: (String? novoValor) {
+                    if (novoValor != null) {
+                      setState(() => _criterioOrdenacao = novoValor);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+          const Divider(),
+
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: pratoController.buscarPratos(_textoBusca),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: Colors.green),
-                  );
+                  return const Center(child: CircularProgressIndicator(color: Colors.green));
                 }
-
-                if (snapshot.hasError) {
-                  return const Center(
-                    child: Text('Erro ao realizar a busca.'),
-                  );
-                }
-
+                if (snapshot.hasError) return const Center(child: Text('Erro ao realizar a busca.'));
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      'Nenhum prato encontrado com esse nome. 😔',
-                      style: TextStyle(color: Colors.grey, fontSize: 16),
-                    ),
-                  );
+                  return const Center(child: Text('Nenhum prato encontrado. 😔'));
                 }
 
-                final pratosEncontrados = snapshot.data!.docs;
+                // Pega os documentos originais do Firebase
+                List<DocumentSnapshot> pratos = snapshot.data!.docs;
+
+                // 👉 Executa a ordenação na lista local de acordo com o critério escolhido
+                if (_criterioOrdenacao == "nome") {
+                  pratos.sort((a, b) => (a['nome'] ?? '').toString().compareTo((b['nome'] ?? '').toString()));
+                } else if (_criterioOrdenacao == "preco") {
+                  pratos.sort((a, b) => (a['preco'] ?? 0).compareTo(b['preco'] ?? 0));
+                }
 
                 return ListView.builder(
-                  itemCount: pratosEncontrados.length,
+                  itemCount: pratos.length,
                   itemBuilder: (context, index) {
-                    final dados = pratosEncontrados[index].data() as Map<String, dynamic>;
-                    
+                    final dados = pratos[index].data() as Map<String, dynamic>;
                     String nome = dados['nome'] ?? 'Sem nome';
                     String categoria = dados['categoria'] ?? 'Geral';
                     double preco = (dados['preco'] ?? 0.0).toDouble();
