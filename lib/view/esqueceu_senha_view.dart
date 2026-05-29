@@ -10,53 +10,50 @@ class EsqueceuSenhaView extends StatefulWidget {
 }
 
 class _EsqueceuSenhaViewState extends State<EsqueceuSenhaView> {
-  final TextEditingController emailController = TextEditingController();
-
   final usuarioController = GetIt.I<UsuarioController>();
+  final _emailController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  bool _carregando = false;
 
-  bool carregando = false;
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
+  }
 
-  void recuperarSenha() async {
-    String email = emailController.text.trim();
+  // 👉 Executa a recuperação conectada ao Firebase com Feedback Visual (RF001)
+  Future<void> _recuperarSenha() async {
+    if (!_formKey.currentState!.validate()) return;
 
-    if (email.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, digite o seu e-mail.')),
-      );
-      return;
-    }
-
-    setState(() {
-      carregando = true;
-    });
+    setState(() => _carregando = true);
 
     try {
-      await usuarioController.recuperarSenha(email);
+      // Chama a função do seu UsuarioController
+      await usuarioController.recuperarSenha(_emailController.text.trim());
 
       if (mounted) {
+        // Alerta de Sucesso informativo exigido pelo critério
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('E-mail de redefinição enviado! Verifique sua caixa de entrada.'),
+            content: Text('E-mail de redefinição enviado! Verifique sua caixa de entrada. 📬'),
             backgroundColor: Colors.green,
           ),
         );
+        // Voltar para a tela de login automaticamente após o envio
         Navigator.pop(context);
       }
-    } catch (erro) {
+    } catch (e) {
       if (mounted) {
+        // Alerta de Erro caso o e-mail não exista ou esteja mal digitado
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Erro ao enviar e-mail: Verifique se o endereço está correto.'),
-            backgroundColor: Colors.redAccent,
+          SnackBar(
+            content: Text('Erro ao enviar e-mail: ${e.toString()}'),
+            backgroundColor: Colors.red,
           ),
         );
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          carregando = false;
-        });
-      }
+      if (mounted) setState(() => _carregando = false);
     }
   }
 
@@ -65,62 +62,54 @@ class _EsqueceuSenhaViewState extends State<EsqueceuSenhaView> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Recuperar Senha'),
+        backgroundColor: Colors.green,
+        foregroundColor: Colors.white,
       ),
-      body: carregando
-          ? const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(color: Colors.green),
-                  SizedBox(height: 15),
-                  Text('Solicitando redefinição ao Firebase...'),
-                ],
+      body: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Insira seu e-mail cadastrado para receber as instruções de redefinição de senha.',
+                style: TextStyle(fontSize: 16, color: Colors.black54),
+                textAlign: TextAlign.center,
               ),
-            )
-          : Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text(
-                    'Esqueceu sua senha?',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'Digite seu e-mail abaixo e enviaremos um link para você cadastrar uma nova senha.',
-                    style: TextStyle(fontSize: 14, color: Colors.grey),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 30),
-                  TextField(
-                    controller: emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: InputDecoration(
-                      labelText: 'Seu E-mail',
-                      prefixIcon: const Icon(Icons.email),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
+              const SizedBox(height: 24),
+              TextFormField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  labelText: 'Seu E-mail',
+                  prefixIcon: Icon(Icons.email, color: Colors.green),
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty || !value.contains('@')) {
+                    return 'Por favor, insira um e-mail válido.';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 20),
+              _carregando
+                  ? const Center(child: CircularProgressIndicator(color: Colors.green))
+                  : ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
+                      onPressed: _recuperarSenha, // 👈 Conectado à função acima
+                      child: const Text('Enviar E-mail de Recuperação', style: TextStyle(fontSize: 16)),
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                    ),
-                    onPressed: recuperarSenha,
-                    child: const Text(
-                      'Enviar E-mail de Recuperação',
-                      style: TextStyle(color: Colors.white, fontSize: 16),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
