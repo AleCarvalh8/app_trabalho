@@ -1,104 +1,144 @@
 import 'package:flutter/material.dart';
+import 'package:get_it/get_it.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../controller/prato_controller/prato_controller.dart';
+import '../controller/usuario_controller.dart';
 
-class CardapioView extends StatelessWidget {
+class CardapioView extends StatefulWidget {
   const CardapioView({super.key});
 
-  String getCardapioDoDia() {
-    int dia = DateTime.now().weekday;
+  @override
+  State<CardapioView> createState() => _CardapioViewState();
+}
 
-    switch (dia) {
-      case 1:
-        return 'Moqueca de banana-da-terra com arroz integral';
-      case 2:
-        return 'Feijoada vegana com tofu defumado e couve';
-      case 3:
-        return 'Estrogonofe de grão-de-bico com purê de batata';
-      case 4:
-        return 'Escondidinho de lentilha com purê de mandioquinha';
-      case 5:
-        return 'Lasanha de berinjela com arroz à grega';
-      case 6:
-        return 'Quibe de abóbora com tabule de quinoa';
-      case 7:
-        return 'Yakisoba vegano com legumes e arroz jasmine';
-      default:
-        return 'Cardápio não disponível';
-    }
-  }
-
-  String getNomeDia() {
-    int dia = DateTime.now().weekday;
-
-    switch (dia) {
-      case 1:
-        return 'Segunda-feira';
-      case 2:
-        return 'Terça-feira';
-      case 3:
-        return 'Quarta-feira';
-      case 4:
-        return 'Quinta-feira';
-      case 5:
-        return 'Sexta-feira';
-      case 6:
-        return 'Sábado';
-      case 7:
-        return 'Domingo';
-      default:
-        return '';
-    }
-  }
+class _CardapioViewState extends State<CardapioView> {
+  final pratoController = GetIt.I<PratoController>();
+  final usuarioController = GetIt.I<UsuarioController>();
 
   @override
   Widget build(BuildContext context) {
-
-    String prato = getCardapioDoDia();
-    String dia = getNomeDia();
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Cardápio do Dia'),
-      ),
-
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Card(
-            elevation: 5,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-
-                  Text(
-                    dia,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  const Icon(Icons.restaurant_menu,
-                      size: 60, color: Colors.green),
-
-                  const SizedBox(height: 20),
-
-                  Text(
-                    prato,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                ],
-              ),
-            ),
-          ),
+        title: const Text('🍔 Nosso Cardápio'),
+        backgroundColor: Colors.green,
+        foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.pushNamed(context, 'home'); 
+          },
         ),
+      ),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: pratoController.listarPratos(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(color: Colors.green),
+            );
+          }
+
+          if (snapshot.hasError) {
+            return const Center(
+              child: Text('Erro ao carregar o cardápio. Tente novamente.'),
+            );
+          }
+
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(
+              child: Text('Nenhum prato disponível no momento. 😔'),
+            );
+          }
+
+          final listaDePratos = snapshot.data!.docs;
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(12),
+            itemCount: listaDePratos.length,
+            itemBuilder: (context, index) {
+              final dadosDoPrato = listaDePratos[index].data() as Map<String, dynamic>;
+
+              String nome = dadosDoPrato['nome'] ?? 'Sem nome';
+              String descricao = dadosDoPrato['descricao'] ?? 'Sem descrição';
+              String categoria = dadosDoPrato['categoria'] ?? 'Geral';
+              double preco = (dadosDoPrato['preco'] ?? 0.0).toDouble();
+
+              return Card(
+                elevation: 4,
+                margin: const EdgeInsets.symmetric(vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade100,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          categoria.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 10, 
+                            fontWeight: FontWeight.bold, 
+                            color: Colors.green.shade800
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        nome,
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        descricao,
+                        style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'R\$ ${preco.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontSize: 16, 
+                              fontWeight: FontWeight.bold, 
+                              color: Colors.green
+                            ),
+                          ),
+                          ListenableBuilder(
+                            listenable: usuarioController,
+                            builder: (context, child) {
+                              bool jaEhFavorito = usuarioController.favoritos.contains(nome);
+                              return IconButton(
+                                icon: Icon(
+                                  jaEhFavorito ? Icons.favorite : Icons.favorite_border, 
+                                  color: Colors.red
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    if (jaEhFavorito) {
+                                      usuarioController.removerFavorito(nome);
+                                    } else {
+                                      usuarioController.adicionarFavorito(nome);
+                                    }
+                                  });
+                                },
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }

@@ -7,7 +7,10 @@ environment:
   sdk: ^3.11.4
 
 dependencies:
+  cloud_firestore: ^6.4.1
   device_preview_plus: ^2.6.2
+  firebase_auth: ^6.5.1
+  firebase_core: ^4.9.0
   flutter:
     sdk: flutter
   get_it: ^9.2.1

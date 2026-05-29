@@ -1,99 +1,79 @@
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
-import '../controller/usuario_controller.dart';
-import 'detalhe_prato_view.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../controller/prato_controller/prato_controller.dart';
 
-class ListaPratosView extends StatelessWidget {
+class ListaPratosView extends StatefulWidget {
   const ListaPratosView({super.key});
 
   @override
+  State<ListaPratosView> createState() => _ListaPratosViewState();
+}
+
+class _ListaPratosViewState extends State<ListaPratosView> {
+  final pratoController = GetIt.I<PratoController>();
+
+  @override
   Widget build(BuildContext context) {
-
-    final usuarioController = GetIt.I<UsuarioController>();
-
-    final List<Map<String, String>> pratos = [
-      {
-        'nome': 'Moqueca de banana',
-        'descricao': 'Com arroz integral'
-      },
-      {
-        'nome': 'Feijoada vegana',
-        'descricao': 'Com tofu defumado'
-      },
-      {
-        'nome': 'Estrogonofe de grão-de-bico',
-        'descricao': 'Com purê de batata'
-      },
-      {
-        'nome': 'Escondidinho de lentilha',
-        'descricao': 'Com mandioquinha'
-      },
-      {
-        'nome': 'Lasanha de berinjela',
-        'descricao': 'Com arroz à grega'
-      },
-      {
-        'nome': 'Quibe de abóbora',
-        'descricao': 'Com tabule de quinoa'
-      },
-      {
-        'nome': 'Yakisoba vegano',
-        'descricao': 'Com legumes e arroz jasmine'
-      },
-    ];
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Lista de Pratos'),
+        title: const Text('📋 Lista de Pratos'),
+        backgroundColor: Colors.green,
+        foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            // Garante o retorno explícito para a Home sem esvaziar a pilha
+            Navigator.pushNamed(context, 'home'); 
+          },
+        ),
       ),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: pratoController.listarPratos(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(color: Colors.green),
+            );
+          }
 
-      body: AnimatedBuilder(
-        animation: usuarioController,
-        builder: (context, _) {
+          if (snapshot.hasError) {
+            return const Center(
+              child: Text('Erro ao carregar a lista.'),
+            );
+          }
 
-          return ListView.builder(
-            itemCount: pratos.length,
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(
+              child: Text('Nenhum prato cadastrado no Firebase.'),
+            );
+          }
+
+          final listaDePratos = snapshot.data!.docs;
+
+          return ListView.separated(
+            padding: const EdgeInsets.all(16),
+            itemCount: listaDePratos.length,
+            separatorBuilder: (context, index) => const Divider(),
             itemBuilder: (context, index) {
+              final dadosDoPrato = listaDePratos[index].data() as Map<String, dynamic>;
 
-              String nomePrato = pratos[index]['nome']!;
-              String descricao = pratos[index]['descricao']!;
-              bool ehFavorito = usuarioController.favoritos.contains(nomePrato);
+              String nome = dadosDoPrato['nome'] ?? 'Sem nome';
+              String categoria = dadosDoPrato['categoria'] ?? 'Geral';
+              double preco = (dadosDoPrato['preco'] ?? 0.0).toDouble();
 
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                child: ListTile(
-                  leading: const Icon(Icons.restaurant, color: Colors.green),
-                  title: Text(nomePrato),
-                  subtitle: Text(descricao),
-
-                  // 👉 CLICAR ABRE DETALHE
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => DetalhePratoView(
-                          nome: nomePrato,
-                          descricao: descricao,
-                        ),
-                      ),
-                    );
-                  },
-
-                  // ⭐ FAVORITOS
-                  trailing: IconButton(
-                    icon: Icon(
-                      ehFavorito ? Icons.star : Icons.star_border,
-                      color: ehFavorito ? Colors.orange : null,
-                    ),
-                    onPressed: () {
-                      if (ehFavorito) {
-                        usuarioController.removerFavorito(nomePrato);
-                      } else {
-                        usuarioController.adicionarFavorito(nomePrato);
-                      }
-                    },
-                  ),
+              return ListTile(
+                leading: const Icon(Icons.restaurant_menu, color: Colors.green),
+                title: Text(
+                  nome,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
+                subtitle: Text(categoria.toUpperCase(), style: const TextStyle(fontSize: 12)),
+                trailing: Text(
+                  'R\$ ${preco.toStringAsFixed(2)}',
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                ),
+                onTap: () {},
               );
             },
           );
