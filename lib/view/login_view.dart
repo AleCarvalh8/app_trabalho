@@ -46,7 +46,7 @@ class _LoginViewState extends State<LoginView> {
         Navigator.pushReplacementNamed(context, 'home');
       }
     } catch (erro) {
-      // 3. Se o Firebase rejeitar (senha errada, conta bloqueada, etc.), avisa o usuário
+      // 3. Se o Firebase beigeitar (senha errada, conta bloqueada, etc.), avisa o usuário
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -150,7 +150,8 @@ class _LoginViewState extends State<LoginView> {
                       ),
                       TextButton(
                         onPressed: () {
-                          Navigator.pushNamed(context, 'esqueceu');
+                          // 😉 Corrigido de 'esqueceu' para 'esqueceu_senha' para bater com o main.dart
+                          Navigator.pushNamed(context, 'esqueceu_senha');
                         },
                         child: const Text('Esqueceu a senha?'),
                       ),
